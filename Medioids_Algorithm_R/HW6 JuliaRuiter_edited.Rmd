@@ -1,0 +1,225 @@
+---
+title: "HW6"
+author: "Julia Ruiter"
+date: "10/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Starter code
+Creates dataframe of 100 samples consisting fo attributes 'x1' and 'x2'
+```{r setup2}
+library(tidyverse)
+clus_df <- read_csv("https://raw.githubusercontent.com/vankesteren/dav_practicals/master/12_Unsupervised_learning_Clustering/data/clusterdata.csv")
+
+clus_df
+```
+
+
+## calculate (euclidean) distance
+-- DO NOT DO IT THIS WAY
+PLEASE IGNORE THIS SECTION AND MOVE ONTO THE NEXT
+
+```{r euclidean}
+#df_working <- clus_df   # create an editable df without modifying original
+
+#distance_df <- data.frame(row1index=double(),
+                 #row2index=double(), 
+                 #euc_dist=double(), 
+                 #stringsAsFactors=FALSE)   # creates blank dataframe to insert lines into
+
+#for (k in nrow(clus_df)-1){
+  # create variables -- unnecessary, but easier to follow
+  #x1k <- clus_df[k,1]
+  #x2k <- clus_df[k,2]
+  #for (j in df_working){
+    #x1j <- clus_df[j,1]
+    #x2j <- clus_df[j,2]   
+    
+    #ij_dist <- sqrt( (x1k[[1]]-x1j[[1]])^2 + (x2k[[1]]-x2j[[1]])^2 )  # euclidean distance between rows i and j
+   # new_entry <- data.frame(i, j, ij_dist)  #cannot use this
+    #distance_df %>% add_row(row1index = k, row2index = j, euc_dist = ij_dist)
+    #print(distance_df)
+  #}
+  #df_working <- df_working[2:nrow(df_working)]  # remove first line to prevent redundancies
+#}
+#distance_df
+```
+
+
+## Question 2:  
+trying to create a function in r
+Remember that r is base 1, not base 0!!
+```{r dist}
+l2_dist <- function(a, b) sqrt((a[[1]] - b[[1]])^2 + (a[[2]] - b[[2]])^2)
+#l2_dist(clus_df[1,], clus_df[2,])
+```
+
+
+
+## calculate (euclidean) distance - simplified
+```{r unused}
+#distance_matrix <- dist(clus_df)
+```
+There is an existing library/call for calculating distances within a dataframe.  I am not using this for today's assignment, but it's good to know
+
+
+## Question 2:  Medioids algorithm
+Step 1:  initialise
+create 2 dataframes -- one is the k randomly selected medioids, and the other is the remaining points
+
+This example will be done assume K = 3
+```{r setseed}
+set.seed(42)  # answer to life, the universe, and everything!!
+
+rows <- sample(nrow(clus_df))
+l2_dist_shuffled <- clus_df[rows, ]
+#l2_dist_shuffled
+
+mediods_set <- l2_dist_shuffled[0:3,]
+mediods_set
+```
+Now compute distances 
+NOTE:  THE FORMULA BELOW DOES NOT WORK, SEE NEXT SECTION
+```{r computing_init}
+#clus_df_mediods <- 
+ # l2_dist_shuffled %>%
+  #mutate(k1_dist = l2_dist(l2_dist_shuffled[i,], mediods_set[1,]))  # this does not operate rowwise
+ # rowwise() %>%
+  #mutate(k1_dist = sqrt(x1 - mediods_set[[1,1]])^2 + (x2 - mediods_set[[1,2]])^2)
+#clus_df_mediods 
+
+#for (k in nrow(l2_dist_shuffled)){
+ # dist_k1 <- l2_dist(l2_dist_shuffled[1,], mediods_set[1,])
+  #print(dist_k1)
+#}
+#distance_df
+```
+
+The formula from earlier:  
+l2_dist <- function(a, b) sqrt((a[[1]] - b[[1]])^2 + (a[[2]] - b[[2]])^2
+
+
+
+## adding the distances to each k coordinate
+The formula from earlier:  
+l2_dist <- function(a, b) sqrt((a[[1]] - b[[1]])^2 + (a[[2]] - b[[2]])^2
+
+==> I had to split this up because the formula I created earlier handled rows, not individual entities
+
+```{r adding_to_df}
+clus_df_mediods <- 
+  l2_dist_shuffled %>%
+  mutate(k1_x1 = mediods_set[[1,1]]) %>%
+  mutate(k1_x2 = mediods_set[[1,2]]) %>%  # added k1 info
+  mutate(k2_x1 = mediods_set[[2,1]]) %>%
+  mutate(k2_x2 = mediods_set[[2,2]]) %>%  ## added k2 info
+  mutate(k3_x1 = mediods_set[[3,1]]) %>%
+  mutate(k3_x2 = mediods_set[[3,2]]) %>%    ### added k3 info
+  rowwise %>%
+  mutate(k1_dist = sqrt((x1 - k1_x1)^2 + (x2 - k1_x2)^2))  %>% # done with k1 information
+  mutate(k2_dist = sqrt((x1 - k2_x1)^2 + (x2 - k2_x2)^2))  %>% # done with k2 information
+  mutate(k3_dist = sqrt((x1 - k3_x1)^2 + (x2 - k3_x2)^2))   %>% # done with k3 information !!!
+  mutate(group_value = min(k1_dist, k2_dist, k3_dist))   %>% #  create new column that selects minimum of the 3 k distance value
+  mutate(group = case_when(group_value == k1_dist ~ 'k1',
+                        group_value == k2_dist ~ 'k2',
+                        group_value == k3_dist ~ 'k3') )  # casewise to see which value the minimum belonged to
+
+clus_df_mediods 
+```
+This method isn't very efficient because it stores 7 more columns than it needs.  But for clarity, I'm keeping it like this (for now).
+
+### Plotting the initial assignments
+```{r plot_init}
+ggplot(clus_df_mediods, aes(x = x1, y = x2, color = group)) + geom_point()
+```
+
+### SOLUTION THUS FAR:  
+This process assigns all entries to a category based on k=3 arbitrary centroids.  In this case, the seed was 42; if the seed is changed, different centroids are chosen, and thus the categories will be slightly different in content.
+
+
+### PROBLEM:  
+I am unsure how to turn this into a proper medioid algorithm.  
+Logically, I'd like to do the following:  
+1) create a a tally of how many points are in each group
+2) calculate the centroid of each k group and assign this as the new mediod df
+3) do the process in clus_df_mediods again
+4) count how many rows changed categories
+5) keep repeating the earlier steps until no rows change categories
+
+
+### IDEA:  
+1) calculate centroid of each cluster, using clus_df_mediods as the base dataset
+2) count entries in each category 
+3) run a while loop for as long as count entries variable (new) - (old) is greater than 0
+4) output final category assignments
+
+```{r loops}
+set.seed(NULL)   # get rid of seet set because everything needs to be random and different
+old_df <- clus_df_mediods  # preserve previous dataframe for later comparison
+
+# calculate the centroid using mean -- this is the x1 for k1
+#k1_x1 <- mean(old_df_k1$x1) ==> this will be used in the while loop
+
+row_dif <- nrow(old_df) # this is an arbitrary initial value larger than 0
+# start loop
+while (row_dif > 0) {
+  # create framework for centroids for old set
+  old_df_k1 <- filter(old_df, group == "k1")
+  old_df_k2 <- filter(old_df, group == "k2")
+  old_df_k3 <- filter(old_df, group == "k3")
+  
+  #randomize_df <- sample(nrow(old_df))
+  #new_df <- old_df[randomize_df, ]  # create a new randomised order per time 
+  ### I commented this section out because I'm going to follow the same structure as earlier instead of trying to replace values.
+  rows <- sample(nrow(clus_df))
+  l2_dist_shuffled <- clus_df[rows, ]
+  
+  new_df <- 
+    l2_dist_shuffled %>%
+    mutate(k1_x1 = mean(old_df_k1$x1)) %>%
+    mutate(k1_x2 = mean(old_df_k1$x2)) %>%  # added k1  using the old_df centroids
+    mutate(k2_x1 = mean(old_df_k2$x1)) %>%
+    mutate(k2_x2 = mean(old_df_k2$x2)) %>%  
+    mutate(k3_x1 = mean(old_df_k3$x1)) %>%
+    mutate(k3_x2 = mean(old_df_k3$x2)) %>%
+    rowwise %>%
+    mutate(k1_dist = sqrt((x1 - k1_x1)^2 + (x2 - k1_x2)^2))  %>% # done with k1 information
+    mutate(k2_dist = sqrt((x1 - k2_x1)^2 + (x2 - k2_x2)^2))  %>% # done with k2 information
+    mutate(k3_dist = sqrt((x1 - k3_x1)^2 + (x2 - k3_x2)^2))   %>% # done with k3 information !!!
+    mutate(group_value = min(k1_dist, k2_dist, k3_dist))   %>% #  create new column that selects minimum of the 3 k distance value
+    mutate(group = case_when(group_value == k1_dist ~ 'k1',
+                          group_value == k2_dist ~ 'k2',
+                          group_value == k3_dist ~ 'k3') )
+  
+  #  Now we can compare counts to see what if anything has moved
+  # first make the new tables
+  new_df_k1 <- filter(new_df, group == "k1")
+  new_df_k2 <- filter(new_df, group == "k2")
+  new_df_k3 <- filter(new_df, group == "k3")
+  
+  # then compare sums4
+  dif_k1 <- nrow(new_df_k1) - nrow(old_df_k1)
+  dif_k2 <- nrow(new_df_k2) - nrow(old_df_k2)  
+  dif_k3 <- nrow(new_df_k3) - nrow(old_df_k3)
+  
+  row_dif <- abs(dif_k1) + abs(dif_k2) + abs(dif_k3)  # because the first assignment for row_dif was arbitrary, that means this loop will run at least twice
+  
+  # now we have an exit condition -- all that's left is to set up for any necessary loops
+  old_df <- new_df
+}
+
+final_assignments <- old_df %>% select(x1, x2, group_value) # returns the final assignments (assuming 3 clusters)
+final_assignments
+```
+### Plotting the final assignments
+```{r plot_final}
+ggplot(old_df, aes(x = x1, y = x2, color = group)) + geom_point()
+```
+
+### Final Comments
+As you can see, the code above has a looooot of redundant and repetitive code.
+Were this programmed in Python, I would have used helper functions.  However, at this time, I am unable to program the equivalent in R.  I will revisit the code and try to optimise it after solutions are posted.
